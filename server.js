@@ -40,6 +40,20 @@ const io = socketIo(server, {
 app.use(cors(corsOptions));
 app.use(express.json());
 
+// Basic health check so the service responds at the root URL in Render.
+app.get('/', (_req, res) => {
+    res.status(200).json({
+        status: 'ok',
+        service: 'chat-app-backend'
+    });
+});
+
+app.get('/health', (_req, res) => {
+    res.status(200).json({
+        status: 'ok'
+    });
+});
+
 // MongoDB connection
 const MONGODB_URI = process.env.MONGODB_URI;
 
