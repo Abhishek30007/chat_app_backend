@@ -14,22 +14,36 @@ const Room = require('./models/Room');
 
 const app = express();
 const server = http.createServer(app);      
-const allowedOrigins = (process.env.CLIENT_URL || process.env.CORS_ORIGIN || 'http://localhost:3000')
-    .split(',')
-    .map(origin => origin.trim())
-    .filter(Boolean);
+
+const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://chat-app-frontend-029z.onrender.com'
+];
+if (process.env.CLIENT_URL) {
+    allowedOrigins.push(...process.env.CLIENT_URL.split(',').map(o => o.trim()));
+}
+if (process.env.CORS_ORIGIN) {
+    allowedOrigins.push(...process.env.CORS_ORIGIN.split(',').map(o => o.trim()));
+}
 
 const corsOptions = {
     origin: (origin, callback) => {
-        const isRenderOrigin = process.env.NODE_ENV === 'production' && /^https:\/\/[a-z0-9-]+\.onrender\.com$/.test(origin || '');
+        if (!origin) {
+            return callback(null, true);
+        }
 
-        if (!origin || allowedOrigins.includes(origin) || isRenderOrigin) {
+        const isLocal = /^https?:\/\/localhost(:\d+)?$/.test(origin) || /^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin);
+        const isRenderOrigin = /^https:\/\/[a-z0-9-_]+\.onrender\.com$/.test(origin);
+
+        if (isLocal || isRenderOrigin || allowedOrigins.includes(origin)) {
             return callback(null, true);
         }
 
         return callback(new Error(`Origin ${origin} is not allowed by CORS`));
     },
-    methods: ['GET', 'POST']
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true
 };
 
 const io = socketIo(server, {
