@@ -50,32 +50,46 @@ app.get('/', (_req, res) => {
 
 app.get('/health', (_req, res) => {
     res.status(200).json({
-        status: 'ok'
+        status: 'ok',
+        database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
     });
 });
 
 // MongoDB connection
 const MONGODB_URI = process.env.MONGODB_URI;
 
-if (process.env.NODE_ENV === 'production' && /localhost|127\.0\.0\.1/.test(MONGODB_URI || '')) {
-    console.error('MONGODB_URI points to localhost. Use a MongoDB Atlas connection string on Render.');
-    process.exit(1);
-}
-
 if (!MONGODB_URI) {
     console.error('MONGODB_URI is not set');
-    process.exit(1);
 }
 
-mongoose.connect(MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-})
-    .then(() => console.log('Connected to MongoDB'))
-    .catch(err => {
-        console.error('MongoDB connection error:', err);
-        process.exit(1);
-    });
+async function connectToMongo() {
+    if (!MONGODB_URI) return;
+
+    if (process.env.NODE_ENV === 'production' && /localhost|127\.0\.0\.1/.test(MONGODB_URI)) {
+        console.error('MONGODB_URI points to localhost. Use a MongoDB Atlas connection string on Render.');
+        return;
+    }
+
+    try {
+        await mongoose.connect(MONGODB_URI, {
+            serverSelectionTimeoutMS: 10000
+        });
+        console.log('Connected to MongoDB');
+    } catch (err) {
+        console.error('MongoDB connection error:', err.message);
+        setTimeout(connectToMongo, 10000);
+    }
+}
+
+connectToMongo();
+
+app.use('/api', (_req, res, next) => {
+    if (mongoose.connection.readyState !== 1) {
+        return res.status(503).json({ message: 'Database is not connected yet' });
+    }
+
+    return next();
+});
 
 // Routes                                
 app.use('/api/auth', authRoutes);           
